@@ -1,7 +1,7 @@
 include scripts/config.mk
 
-.PHONY: all floppy_image kernel bootloader clean always
-all: floppy_image
+.PHONY: all floppy_image kernel bootloader clean always test
+all: floppy_image test
 
 include scripts/toolchain.mk
 
@@ -30,6 +30,12 @@ build/stage2.bin: always
 kernel: build/kernel.bin
 build/kernel.bin: always
 	@$(MAKE) -C src/kernel BUILD_DIR=$(abspath build)
+
+#	TEST
+test: $(BUILD_DIR)/test
+$(BUILD_DIR)/test: always
+	@mkdir -p $(BUILD_DIR)/test
+	@$(MAKE) -C test BUILD_DIR=$(abspath $(BUILD_DIR))
 
 #	ALWAYS
 always:

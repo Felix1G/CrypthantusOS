@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
-#include "../stdio.h"
+#include <stdio.h>
 #include <arch/i686/gdt.h>
 #include <arch/i686/idt.h>
 #include <arch/i686/isr.h>

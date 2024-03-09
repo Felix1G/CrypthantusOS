@@ -1,8 +1,10 @@
 #include <stdint.h>
-#include "stdio.h"
-#include "string.h"
+#include <stdio.h>
+#include <string.h>
+#include <stack.h>
 #include "hal/hal.h"
 #include "util/cmd.h"
+#include "util/buddy_alloc.h"
 #include <boot/bootlib.h>
 
 extern uint8_t __bss_start;
@@ -33,6 +35,25 @@ void user_func()
     //printf("No more doing weird stuff.");
 }
 
+typedef struct 
+{
+    int a, b, c, d, e;
+} TEST_STRUCT;
+
+TEST_STRUCT* init_test_struct(int rand)
+{
+    TEST_STRUCT* test = buddy_alloc(10 * sizeof(TEST_STRUCT));
+    for (int i = 0;i < 10;i++)
+    {
+        test[i].a = (2 * rand) << i;
+        test[i].b = (4 * rand) << i;
+        test[i].c = (5 * rand) << i;
+        test[i].d = (7 * rand) << i;
+        test[i].e = (9 * rand) << i;
+    }
+    return test;
+}
+
 void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOOT_DATA* boot_data)
 {
     memset(&__bss_start, 0, (&__end) - (&__bss_start));
@@ -40,11 +61,15 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
 
     printf("[LOG]Initialising HAL.");
     hal_init();
-
     hal_keyboard_onpress(keyboard_listener);
+
+    printf("[LOG]Initialising Buddy Allocator.");
+    buddy_init();
 
     char buffer[1024];
     char command[1024];
+    STACK* stack = stack_init(sizeof(unsigned));
+
     while (true) {
         *buffer = '\0';
         
@@ -79,7 +104,36 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
         }
         else if (!strcmp(command, "try"))
         {
-            
+            uint8_t* p = buddy_alloc(64 * 1024 * 1024);
+            if (p == NULL)
+                printf("NULL\n");
+            else {
+                if (stack_push(stack, (void*)p))
+                    printf("[ERROR]STACK PUSH FAILED");
+                printf("0x%X\n", (unsigned)p);
+                for (int i = 0;i < 1024 * 1024;i++)
+                    p[i] = 0x00;
+            }
+        }
+        else if (!strcmp(command, "try1"))
+        {
+            unsigned* a = (unsigned*)stack_pop(stack);
+            if (a) {
+                printf("0x%X\n", *a);
+                buddy_free(*a);
+            } else {
+                printf("NULL\n");
+            }
+        }
+        else if (!strcmp(command, "try2"))
+        {
+            uint8_t* p = buddy_alloc(32 * 1024 * 1024);
+            if (p == NULL)
+                printf("NULL\n");
+            else {
+                stack_push(stack, p);
+                printf("0x%X\n", (unsigned)p);
+            }
         }
         else if (!strcmp(command, "memmap"))
         {

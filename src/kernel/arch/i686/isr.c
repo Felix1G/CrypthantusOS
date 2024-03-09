@@ -1,6 +1,6 @@
 #include "isr.h"
 #include "idt.h"
-#include "../../stdio.h"
+#include <stdio.h>
 
 ISR_HANDLER isr_handlers[256];
 
