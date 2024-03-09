@@ -1,5 +1,6 @@
 #include "buddy_alloc.h"
 #include <stdint.h>
+#include <stdio.h>
 
 #define BUDDY_LAYERS 16
 #define BUDDY_ARRAY_SIZE (1 << BUDDY_LAYERS) >> 3
@@ -28,21 +29,66 @@ void buddy_block_set(int layer, int idx, int val)
     g_buddy_block[arr_idx] = (g_buddy_block[arr_idx] & ~(1 << index)) | (val << index);
 }
 
-const int g_buddy_max_block = 1024 * 1024 * 512; //512MB
-const int g_buddy_min_block = g_buddy_max_block >> (BUDDY_LAYERS - 1);
+int g_buddy_max_block;
+int g_buddy_min_block;
+int g_buddy_layers;
 void* g_buddy_start;
 
-void buddy_init()
+int buddy_init(BOOT_DATA* boot_data)
 {
-    g_buddy_start = (void*)0x300000; //TODO find a better place for memory :)
+    int max_size = 0;
+    MEMORY_BLOCK* begin = 0;
+
+    for (int i = 0; i < boot_data->memory.blocks_count; i++)
+    {
+        register MEMORY_BLOCK block = boot_data->memory.blocks[i];
+        if (block.type != MEMORY_BLOCK_TYPE_USABLE)
+            continue;
+            
+        register int size = block.length;
+        if (size > max_size)
+        {
+            max_size = size;
+            begin = boot_data->memory.blocks + i;
+        }
+    }
+
+    if (begin)
+    {
+        max_size >>= 1; //take the second half
+        
+        int layers = 0;
+        while (max_size)
+        {
+            max_size >>= 1;
+            layers++;
+        }
+
+        g_buddy_max_block = 1 << layers >> 1; //>> 1 is intentional
+        g_buddy_min_block = g_buddy_max_block >> max(0, min(layers - 2, BUDDY_LAYERS - 1));
+        g_buddy_layers = min(layers, BUDDY_LAYERS);
+
+        //safely allocate the memory at the end of the memory block
+        //to avoid collision with the kernel's opcodes
+        g_buddy_start = begin->begin + begin->length + 1 - g_buddy_max_block; 
+
+        return g_buddy_max_block;
+    }
+
+    return 0;
 }
 
 void *buddy_alloc(unsigned size)
 {
     if (size > g_buddy_max_block)
         return 0;
+
+    if (buddy_block(0, 0) && !(buddy_block(1, 0) || buddy_block(1, 1)))
+    {
+        return 0; //out of memory
+    }
     
-    int min_layer = BUDDY_LAYERS - 1;
+    int min_layer = g_buddy_layers - 1;
     int min_block_size = g_buddy_min_block;
     while (size > min_block_size)
     {
@@ -90,6 +136,9 @@ buddy_alloc_top_loop:
             }
 
 buddy_alloc_loop:
+            if (buddy_block(layer, idx))
+                continue; //this block is occupied
+
             if (layer == min_layer)
             { //block to allocate found
                 buddy_block_set(layer, idx, 1);
@@ -132,7 +181,7 @@ void buddy_free(void *ptr)
 
     unsigned min_block_idx = ((char*)ptr - (char*)g_buddy_start) / g_buddy_min_block;
     
-    int layer = BUDDY_LAYERS - 1;
+    int layer = g_buddy_layers - 1;
     while (!buddy_block(layer, min_block_idx))
     { //move up to find the occupied block
         layer--;

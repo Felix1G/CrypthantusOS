@@ -3,15 +3,18 @@
 #include <stdint.h>
 #include <util/buddy_alloc.h>
 
-#define STACK_ALLOC_SIZE 8192
-
-STACK* stack_init(unsigned size)
+STACK* stack_init(unsigned size, unsigned elem_size)
 {
-    void* alloc_ptr = buddy_alloc(STACK_ALLOC_SIZE);
-    STACK* stack = (STACK*)((uint8_t*)alloc_ptr + STACK_ALLOC_SIZE - sizeof(STACK)); //allocate stack here
-    stack->elem_size = size;
+    void* alloc_ptr = buddy_alloc(size);
+    if (!alloc_ptr)
+        return 0;
+
+    STACK* stack = (STACK*)((uint8_t*)alloc_ptr + size - sizeof(STACK)); //allocate stack here
+    stack->elem_size = elem_size;
+    stack->alloc_size = size;
     stack->sp = stack;
     stack->min = alloc_ptr;
+
     return stack;
 }
 

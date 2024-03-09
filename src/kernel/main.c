@@ -64,11 +64,26 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
     hal_keyboard_onpress(keyboard_listener);
 
     printf("[LOG]Initialising Buddy Allocator.");
-    buddy_init();
+    int buddy_mem;
+    if (buddy_mem = buddy_init(boot_data))
+    {
+        printf("[LOG]Buddy Allocator initialised. %iKB memory allocated.",
+            buddy_mem >> 10);
+    }
+    else
+    {
+        printf("[ERROR]Buddy Allocator initialisation failed. Kernel ends here.");
+        goto end;
+    }
 
     char buffer[1024];
     char command[1024];
-    STACK* stack = stack_init(sizeof(unsigned));
+    STACK* stack = stack_init(16 * 1024 * 1024, sizeof(unsigned));
+    if (stack == NULL)
+    {
+        printf("[ERROR]Stack cannot be initialised.");
+        goto end;
+    }
 
     while (true) {
         *buffer = '\0';
@@ -104,15 +119,15 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
         }
         else if (!strcmp(command, "try"))
         {
-            uint8_t* p = buddy_alloc(64 * 1024 * 1024);
+            uint8_t* p = buddy_alloc(8 * 1024 * 1024);
             if (p == NULL)
                 printf("NULL\n");
             else {
                 if (stack_push(stack, (void*)p))
                     printf("[ERROR]STACK PUSH FAILED");
                 printf("0x%X\n", (unsigned)p);
-                for (int i = 0;i < 1024 * 1024;i++)
-                    p[i] = 0x00;
+                for (int i = 0;i < 8 * 1024 * 1024;i++)
+                    p[i] = 0;
             }
         }
         else if (!strcmp(command, "try1"))
@@ -127,7 +142,7 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
         }
         else if (!strcmp(command, "try2"))
         {
-            uint8_t* p = buddy_alloc(32 * 1024 * 1024);
+            uint8_t* p = buddy_alloc(2 * 1024 * 1024);
             if (p == NULL)
                 printf("NULL\n");
             else {

@@ -26,8 +26,8 @@ int main()
 {
     buddy_init();
 
-    int* a = test(256 * 1024 * 1024);
     int* b = test(1024);
+    int* a = test(32 * 1024 * 1024);
     int* c = test(1024);
     int* d = test(1024);
     int* e = test(1024);
@@ -67,19 +67,25 @@ void buddy_block_set(int layer, int idx, int val)
     g_buddy_block[arr_idx] = (g_buddy_block[arr_idx] & ~(1 << index)) | (val << index);
 }
 
-const int g_buddy_max_block = 1024 * 1024 * 512; //512MB
+const int g_buddy_max_block = 1024 * 1024 * 32; //512MB
 const int g_buddy_min_block = g_buddy_max_block >> (BUDDY_LAYER_SIZE - 1);
 void* g_buddy_start;
 
 void buddy_init()
 {
-    g_buddy_start = malloc(g_buddy_max_block); //512MB
+    g_buddy_start = malloc(g_buddy_max_block);
 }
 
 void *buddy_alloc(size_t size)
 {
     if (size > g_buddy_max_block)
         return NULL;
+
+    printf("%i %i %i\n", buddy_block(0, 0), buddy_block(1, 0), buddy_block(1,1));
+    if (buddy_block(0, 0) && !(buddy_block(1, 0) && buddy_block(1, 1)))
+    {
+        return NULL; //out of memory
+    }
     
     int min_layer = BUDDY_LAYER_SIZE - 1;
     int min_block_size = g_buddy_min_block;
@@ -94,9 +100,6 @@ void *buddy_alloc(size_t size)
     for (int layer = min_layer;layer >= 0;layer--)
     {
 buddy_alloc_top_loop:
-        if (layer <= 1 && buddy_block(1, 0) && buddy_block(1, 1))
-            return 0;
-
         register int idx_max = 1 << layer;
         for (idx;idx < idx_max;idx += 2)
         {
@@ -129,6 +132,9 @@ buddy_alloc_top_loop:
             }
 
 buddy_alloc_loop:
+            if (buddy_block(layer, idx))
+                continue;
+                
             if (layer == min_layer)
             { //block to allocate found
                 buddy_block_set(layer, idx, 1);

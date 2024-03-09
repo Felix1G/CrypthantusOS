@@ -47,7 +47,7 @@ int cmd_shutdown()
 }
 
 const char* g_memory_block_type_str[4] = {
-    "UNUSABLE", "RESERVED", "RECLAIMABLE", "NVS"
+    "USABLE", "RESERVED", "RECLAIMABLE", "NVS", "BADMEM"
 };
 
 void cmd_memmap(BOOT_DATA* boot_data)
