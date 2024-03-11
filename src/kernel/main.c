@@ -42,7 +42,8 @@ typedef struct
 
 TEST_STRUCT* init_test_struct(int rand)
 {
-    TEST_STRUCT* test = buddy_alloc(10 * sizeof(TEST_STRUCT));
+    int block_size;
+    TEST_STRUCT* test = buddy_alloc(10 * sizeof(TEST_STRUCT), &block_size);
     for (int i = 0;i < 10;i++)
     {
         test[i].a = (2 * rand) << i;
@@ -76,6 +77,7 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
         goto end;
     }
 
+    int block_size;
     char buffer[1024];
     char command[1024];
     STACK* stack = stack_init(16 * 1024 * 1024, sizeof(unsigned));
@@ -107,6 +109,7 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
             printf("[LOG]Commands:");
             printf("echo    \t\t\tprint text to console.\n");
             printf("shutdown\t\t\tshuts down the computer.\n");
+            printf("memmap  \t\t\tprints the memory mapping.\n");
         }
         else if (!strcmp(command, "echo"))
         {
@@ -119,13 +122,13 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
         }
         else if (!strcmp(command, "try"))
         {
-            uint8_t* p = buddy_alloc(8 * 1024 * 1024);
+            uint8_t* p = buddy_alloc(8 * 1024 * 1024, &block_size);
             if (p == NULL)
                 printf("NULL\n");
             else {
                 if (stack_push(stack, (void*)p))
                     printf("[ERROR]STACK PUSH FAILED");
-                printf("0x%X\n", (unsigned)p);
+                printf("0x%X %X\n", (unsigned)p, block_size);
                 for (int i = 0;i < 8 * 1024 * 1024;i++)
                     p[i] = 0;
             }
@@ -142,12 +145,12 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
         }
         else if (!strcmp(command, "try2"))
         {
-            uint8_t* p = buddy_alloc(2 * 1024 * 1024);
+            uint8_t* p = buddy_alloc(1, &block_size);
             if (p == NULL)
                 printf("NULL\n");
             else {
                 stack_push(stack, p);
-                printf("0x%X\n", (unsigned)p);
+                printf("0x%X %X\n", (unsigned)p, block_size);
             }
         }
         else if (!strcmp(command, "memmap"))

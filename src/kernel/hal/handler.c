@@ -15,15 +15,15 @@ int isnotchar(int ch) {
 
 int us_keyboard_down[256] =
 {
-    0x0, KEY_ESC, '1', '2', '3', '4', '5', '6',		                    // 0 - 7
-    '7', '8', '9', '0', '-', '=', KEY_BACKSPACE, '\t',	                // 8 - 15
-    'q', 'w', 'e', 'r', 't', 'y', 'u', 'i',		                        // 16 - 23
-    'o', 'p', '[', ']', '\n', KEY_CTRL, 'a', 's',	                    // 24 - 31
-    'd', 'f', 'g', 'h', 'j', 'k', 'l', ';',		                        // 32 - 39
-    '\'', '`', KEY_LSHIFT, '\\', 'z', 'x', 'c', 'v',	                // 40 - 47
+    0x0, KEY_ESC, '1', '2', '3', '4', '5', '6',                         // 0 - 7
+    '7', '8', '9', '0', '-', '=', KEY_BACKSPACE, '\t',                  // 8 - 15
+    'q', 'w', 'e', 'r', 't', 'y', 'u', 'i',                             // 16 - 23
+    'o', 'p', '[', ']', '\n', KEY_CTRL, 'a', 's',                       // 24 - 31
+    'd', 'f', 'g', 'h', 'j', 'k', 'l', ';',                             // 32 - 39
+    '\'', '`', KEY_LSHIFT, '\\', 'z', 'x', 'c', 'v',                    // 40 - 47
     'b', 'n', 'm', ',', '.', '/', KEY_RSHIFT, '*',                      // 48 - 55
     KEY_ALT, ' ', KEY_CAPS, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5,     // 56 - 63
-    KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, 0x0, 0x0, '7',		        // 64 - 71
+    KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, 0x0, 0x0, '7',             // 64 - 71
     KEY_UP, KEY_PAGE_UP, '-', KEY_LEFT, '5', KEY_RIGHT, '+', '1',       // 72 - 79
     KEY_DOWN, KEY_PAGE_DOWN, '0', '.', KEY_DELETE, 0x0, 0x0, KEY_F11,   // 80 - 87
     KEY_F12                                                             // 88
@@ -31,15 +31,15 @@ int us_keyboard_down[256] =
 
 int us_keyboard_up[256] =
 {
-    0x0, KEY_ESC, '!', '@', '#', '$', '%', '^',		                    // 0 - 7
-    '&', '*', '(', ')', '_', '+', KEY_BACKSPACE, '\t',	                // 8 - 15
-    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I',		                        // 16 - 23
-    'O', 'P', '{', '}', '\n', KEY_CTRL, 'A', 'S',	                    // 24 - 31
-    'D', 'F', 'G', 'H', 'J', 'K', 'L', ':',		                        // 32 - 39
-    '\"', '~', KEY_LSHIFT, '|', 'Z', 'X', 'C', 'V', 	                // 40 - 47
+    0x0, KEY_ESC, '!', '@', '#', '$', '%', '^',                         // 0 - 7
+    '&', '*', '(', ')', '_', '+', KEY_BACKSPACE, '\t',                  // 8 - 15
+    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I',                             // 16 - 23
+    'O', 'P', '{', '}', '\n', KEY_CTRL, 'A', 'S',                       // 24 - 31
+    'D', 'F', 'G', 'H', 'J', 'K', 'L', ':',                             // 32 - 39
+    '\"', '~', KEY_LSHIFT, '|', 'Z', 'X', 'C', 'V',                     // 40 - 47
     'B', 'N', 'M', '<', '>', '?', KEY_RSHIFT, '*',                      // 48 - 55
     KEY_ALT, ' ', KEY_CAPS, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5,     // 56 - 63
-    KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, 0x0, 0x0, '7',		        // 64 - 71
+    KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, 0x0, 0x0, '7',             // 64 - 71
     KEY_UP, KEY_PAGE_UP, '-', KEY_LEFT, '5', KEY_RIGHT, '+', '1',       // 72 - 79
     KEY_DOWN, KEY_PAGE_DOWN, '0', '.', KEY_DELETE, 0x0, 0x0, KEY_F11,   // 80 - 87
     KEY_F12                                                             // 88
