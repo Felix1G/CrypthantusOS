@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stack.h>
 #include "hal/hal.h"
@@ -77,6 +78,17 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
         goto end;
     }
 
+    printf("[LOG]Initialising Heap.");
+    if (heap_init())
+    {
+        printf("[LOG]Heap initiallised!");
+    }
+    else
+    {
+        printf("[ERROR]Heap initialisation failed. Kernel ends here.");
+        goto end;
+    }
+
     int block_size;
     char buffer[1024];
     char command[1024];
@@ -122,35 +134,41 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
         }
         else if (!strcmp(command, "try"))
         {
-            uint8_t* p = buddy_alloc(8 * 1024 * 1024, &block_size);
-            if (p == NULL)
+            unsigned* a = (unsigned*)stack_pop(stack);
+            if (a) {
+                printf("0x%X\n", *a);
+                free(*a);
+                _heap_debug();
+            } else {
+                printf("0x%X\n", *a);
                 printf("NULL\n");
-            else {
-                if (stack_push(stack, (void*)p))
-                    printf("[ERROR]STACK PUSH FAILED");
-                printf("0x%X %X\n", (unsigned)p, block_size);
-                for (int i = 0;i < 8 * 1024 * 1024;i++)
-                    p[i] = 0;
             }
         }
         else if (!strcmp(command, "try1"))
         {
+            int size = 0;
+            scanf("%d", &size);
             unsigned* a = (unsigned*)stack_pop(stack);
             if (a) {
+                *a = realloc((void*)*a, size);
+                stack_push(stack, *a);
                 printf("0x%X\n", *a);
-                buddy_free(*a);
+                _heap_debug();
             } else {
                 printf("NULL\n");
             }
         }
         else if (!strcmp(command, "try2"))
         {
-            uint8_t* p = buddy_alloc(1, &block_size);
+            int size = 0;
+            scanf("%d", &size);
+            uint8_t* p = (uint8_t*)malloc(size);
             if (p == NULL)
                 printf("NULL\n");
             else {
                 stack_push(stack, p);
-                printf("0x%X %X\n", (unsigned)p, block_size);
+                printf("0x%X\n", (unsigned)p);
+                _heap_debug();
             }
         }
         else if (!strcmp(command, "memmap"))

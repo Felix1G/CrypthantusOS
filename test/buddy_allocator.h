@@ -10,7 +10,7 @@ void buddy_free(void *ptr);
 #define BUDDY_ARRAY_SIZE (1 << BUDDY_LAYER_SIZE) >> 3
 
 int buddy_layers[BUDDY_LAYER_SIZE] = { //extra one for the loop in alloc
-    0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383
+    0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383, 32767
 };
 
 uint8_t g_buddy_block[BUDDY_ARRAY_SIZE];

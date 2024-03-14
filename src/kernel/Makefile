@@ -17,17 +17,17 @@ all: kernel
 kernel: $(BUILD_DIR)/kernel.bin
 
 $(BUILD_DIR)/kernel.bin: $(OBJECTS_ASM) $(OBJECTS_C)
-    @$(TARGET_LD) $(TARGET_LINKFLAGS) -Wl,-Map=$(BUILD_DIR)/kernel.map -o $@ $^ $(TARGET_LIBS)
+	@$(TARGET_LD) $(TARGET_LINKFLAGS) -Wl,-Map=$(BUILD_DIR)/kernel.map -o $@ $^ $(TARGET_LIBS)
 
 $(BUILD_DIR)/kernel/c/%.obj: %.c $(HEADERS_C)
-    @mkdir -p $(@D)
-    @$(TARGET_CC) $(TARGET_CFLAGS) -c -o $@ $<
-    @echo "compiled " $<
+	@mkdir -p $(@D)
+	@$(TARGET_CC) $(TARGET_CFLAGS) -c -o $@ $<
+	@echo "compiled " $<
 
 $(BUILD_DIR)/kernel/asm/%.obj: %.asm $(HEADERS_ASM)
-    @mkdir -p $(@D)
-    @$(TARGET_ASM) $(TARGET_ASMFLAGS) -o $@ $<
-    @echo "compiled " $<
+	@mkdir -p $(@D)
+	@$(TARGET_ASM) $(TARGET_ASMFLAGS) -o $@ $<
+	@echo "compiled " $<
 
 clean:
-    @rm -f $(BUILD_DIR)/kernel.bin
+	@rm -f $(BUILD_DIR)/kernel.bin

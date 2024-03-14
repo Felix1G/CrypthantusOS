@@ -10,6 +10,7 @@
  * printf supports the digit specifier, for example, "%08X" which will be 8 digits of capital hex.
  * I've only put %s, %d, %u in scanf. This is due to the fact that only those are needed for now. 
  * More specifiers will be added in the future.
+ * NOTE: scanf("%s") reads a line instead of a word.
  * 
  * Secondly, any characters printed with printf cannot be removed (backspace)
  * unless it goes above the screen (scrollback function). This is to prevent

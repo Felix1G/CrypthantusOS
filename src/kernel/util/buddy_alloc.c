@@ -78,7 +78,7 @@ int buddy_init(BOOT_DATA* boot_data)
     return 0;
 }
 
-void *buddy_alloc(unsigned size, unsigned* block_size)
+void *buddy_alloc(size_t size, size_t* block_size)
 {
     if (size > g_buddy_max_block)
         goto buddy_alloc_ret_0;
@@ -142,7 +142,7 @@ buddy_alloc_loop:
             if (layer == min_layer)
             { //block to allocate found
                 buddy_block_set(layer, idx, 1);
-                *block_size = g_buddy_min_block << (g_buddy_layers - layer);
+                *block_size = g_buddy_min_block << (g_buddy_layers - 1 - layer);
                 return (void*)(min_block_size * idx + g_buddy_start);
             }
             else
@@ -183,7 +183,7 @@ void buddy_free(void *ptr)
     if (!ptr)
         return; //NULL case
 
-    unsigned min_block_idx = ((char*)ptr - (char*)g_buddy_start) / g_buddy_min_block;
+    size_t min_block_idx = ((char*)ptr - (char*)g_buddy_start) / g_buddy_min_block;
     
     int layer = g_buddy_layers - 1;
     while (!buddy_block(layer, min_block_idx))
