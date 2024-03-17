@@ -1,5 +1,6 @@
 #include "hal.h"
 #include <arch/i686/io.h>
+#include <stddef.h>
 
 void _hal_irq_idle(REGISTERS* regs) {}
 
@@ -104,8 +105,8 @@ void hal_keyboard_onpress(void (*listener)(int ch, int up, const KEY_STATE* stat
     g_keyboard_onpress_listener = listener;
 }
 
-void _hal_isr_gpf(REGISTERS* regs)
+void _hal_isr_zdiv(REGISTERS* regs)
 {
-    printf("[ERROR]General Protection Fault.");
+    printf("[ERROR]Division by Zero.");
     i686_panic();
 }

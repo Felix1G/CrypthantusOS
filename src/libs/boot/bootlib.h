@@ -14,8 +14,17 @@ typedef struct {
     int blocks_count;
 } MEMORY_INFO;
 
+typedef struct
+{
+    uint8_t id;
+    uint16_t heads;
+    uint16_t cylinders;
+    uint16_t sectors;
+} DISK;
+
 typedef struct {
     MEMORY_INFO memory;
+    DISK disk;
     uint8_t boot_device;
 } BOOT_DATA;
 

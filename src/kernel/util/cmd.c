@@ -46,7 +46,7 @@ int cmd_shutdown()
     return 1;
 }
 
-const char* g_memory_block_type_str[4] = {
+const char* g_memory_block_type_str[5] = {
     "USABLE", "RESERVED", "RECLAIMABLE", "NVS", "BADMEM"
 };
 

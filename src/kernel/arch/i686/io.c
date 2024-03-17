@@ -1,4 +1,5 @@
 #include "io.h"
+#include <stdio.h>
 
 #define UNUSED_PORT 0x80
 #define KEYBOARD_DAT_PORT 0x60

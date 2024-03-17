@@ -55,3 +55,13 @@ i686_io_wait_keyboard:
 
     call    i686_io_keyboard_read
     ret
+
+global i686_kernel_stack_segment
+i686_kernel_stack_segment:
+    mov     eax, ss
+    ret
+
+global i686_kernel_stack_pointer
+i686_kernel_stack_pointer:
+    mov     eax, esp
+    ret

@@ -1,9 +1,9 @@
-#include <stdlib.h>
+#include "stdlib.h"
+#include <string.h>
 #include <util/buddy_alloc.h>
 
 #define HEAP_FIRST_FIT_MAX_SIZE (8 * 1024)
-#define HEAP_BLOCKS_SIZE 256 * 2 //256 blocks, [address size] (2)
-
+#define HEAP_METADATA_SIZE (16 * 1024)
 typedef size_t* szpt; //size pointer
 
 typedef struct
@@ -23,23 +23,25 @@ typedef struct
     szpt free_ptr;
     szpt temp_ptr;
 
-    szpt* block; //intentional double pointer
+    szpt block;
 } HEAP_CACHE;
 
 HEAP_CACHE* heapc;
-szpt heap_blocks[HEAP_BLOCKS_SIZE]; //memory blocks initialised for the heap (256 blocks, 512 / 2)
-int heap_header_size; //heap header size
-int block_size; //for buddy allocation
+szpt heap_blocks; //memory blocks initialised for the memory
+size_t heap_blocks_size;
 
-void heap_set_mem_block(szpt* block, szpt adr, size_t size)
+int heap_header_size; //heap header size
+size_t block_size; //for buddy allocation
+
+void heap_set_mem_block(szpt block, szpt adr, size_t size)
 {
-    block[0] = adr;
-    block[1] = (szpt)size;
+    block[0] = (size_t)adr;
+    block[1] = (size_t)size;
 }
 
-szpt* heap_mem_block(szpt ptr)
+szpt heap_mem_block(szpt ptr)
 {
-    for (int i = 0;i < HEAP_BLOCKS_SIZE;i += 2)
+    for (int i = 0;i < heap_blocks_size;i += 2)
     {
         if (heap_blocks[i] == 0)
             continue;
@@ -53,18 +55,18 @@ szpt* heap_mem_block(szpt ptr)
     return NULL;
 }
 
-szpt* heap_find_empty_block_ptr()
+szpt heap_find_empty_block_ptr()
 {
-    for (int i = 0;i < HEAP_BLOCKS_SIZE;i += 2)
+    for (int i = 0;i < heap_blocks_size;i += 2)
     {
-        if (heap_blocks[i] == NULL)
+        if (heap_blocks[i] == 0)
             return (heap_blocks + i);
     }
 
     return NULL; //out of blocks
 }
 
-szpt heap_mem_block_end(szpt* block)
+szpt heap_mem_block_end(szpt block)
 {
     return (szpt)((void*)heapc->block[0] + (size_t)heapc->block[1]);
 }
@@ -83,11 +85,19 @@ int heap_in_mem_block(szpt ptr) { return !heap_not_in_mem_block(ptr); }
 int heap_init()
 {
     heap_header_size = sizeof(size_t);
-    heapc = buddy_alloc(sizeof(HEAP_CACHE), &block_size);
+    heapc = buddy_alloc(HEAP_METADATA_SIZE, &block_size);
+
     if (heapc == NULL)
         return 0;
     else
-        return 1;
+    {
+        heap_blocks_size = (block_size - sizeof(HEAP_CACHE)) / heap_header_size;
+        size_t mem_blocks_size = heap_blocks_size * heap_header_size;
+
+        heap_blocks = (szpt)((void*)heapc + (size_t)block_size - mem_blocks_size);
+
+        return mem_blocks_size;
+    }
 }
 
 void* malloc(size_t size)
@@ -210,7 +220,7 @@ hmalloc_loop_continue:
         if (first_fit || heapc->best_avail_size == 2e9)
         {
             //create a new heap/memory block
-            szpt* empty_block_ptr = heap_find_empty_block_ptr();
+            szpt empty_block_ptr = heap_find_empty_block_ptr();
             if (empty_block_ptr == NULL)
                 return NULL;
             
@@ -278,11 +288,10 @@ malloc_allocate_in_between:
     return NULL;
 }
 
-void* calloc(size_t nitems, size_t size)
+void* zmalloc(size_t size)
 {
-    size_t total_size = nitems * size;
-    uint8_t* data = (uint8_t*)malloc(total_size);
-    while (total_size--) *data = 0x00;
+    uint8_t* data = (uint8_t*)malloc(size);
+    while (size--) *data = 0x00;
     return (void*)data;
 }
 
@@ -328,8 +337,8 @@ void* realloc(void* ptr, size_t size)
             }
             else
             {
-                *(szpt)(ptr + size) = *heapc->free_ptr;
-                *heapc->prev_free_ptr = (size_t)(ptr + size);
+                *(szpt)(real_ptr + size) = *heapc->free_ptr;
+                *heapc->prev_free_ptr = (size_t)(real_ptr + size);
             }
         }
 
@@ -372,7 +381,7 @@ void free(void* ptr)
             heapc->free_root = 0x00;
             goto free_clear_blocks;
         }
-        heapc->alloc_ptr = &heapc->alloc_root;
+        heapc->alloc_ptr = (szpt)&heapc->alloc_root;
     }
     else
     {
@@ -399,11 +408,11 @@ void free(void* ptr)
 
         //there is a free pointer in front of this ptr, hence requires merge
         if (!( heapc->alloc_ptr && heapc->free_root && //right sep conditions
-                (heap_not_in_mem_block(*heapc->free_root) ||
-                (heap_in_mem_block(*heapc->alloc_ptr) &&
+                (heap_not_in_mem_block((szpt)*heapc->free_root) ||
+                (heap_in_mem_block((szpt)*heapc->alloc_ptr) &&
                 *heapc->alloc_ptr < *heapc->free_root)) ) && *heapc->free_root != 0)
         {
-            *heapc->free_root = (szpt)**(szpt*)heapc->free_root;
+            *heapc->free_root = **(size_t**)heapc->free_root;
         }
     }
     else if (heapc->free_root == 0x00)
@@ -428,8 +437,8 @@ void free(void* ptr)
                 heapc->alloc_ptr >= heapc->free_ptr);
         int right_sep = //there is an alloc ptr at the right
             heapc->alloc_ptr && heapc->free_ptr &&
-                (heap_not_in_mem_block(*heapc->free_ptr) ||
-                (heap_in_mem_block(*heapc->alloc_ptr) &&
+                (heap_not_in_mem_block((szpt)*heapc->free_ptr) ||
+                (heap_in_mem_block((szpt)*heapc->alloc_ptr) &&
                 *heapc->alloc_ptr < *heapc->free_ptr));
         
         //f - free, a - alloc, n - freed alloc ptr
@@ -510,7 +519,7 @@ void _heap_debug()
     {
         printf("%X ", heapc->alloc_ptr);
         if (heapc->alloc_ptr)
-            heapc->alloc_ptr = *heapc->alloc_ptr;
+            heapc->alloc_ptr = (szpt)*heapc->alloc_ptr;
     } while (heapc->alloc_ptr && i--);
     printf("%s\n| ", i == -1 ? "(Too many addresses)" : "");
 
@@ -520,13 +529,13 @@ void _heap_debug()
     {
         printf("%X ", heapc->free_ptr);
         if (heapc->free_ptr)
-            heapc->free_ptr = *heapc->free_ptr;
+            heapc->free_ptr = (szpt)*heapc->free_ptr;
     } while (heapc->free_ptr && i--);
     printf("%s\n| ", i == -1 ? "(Too many addresses)" : "");
 
-    for (int i = 0;i < HEAP_BLOCKS_SIZE;i += 2)
+    for (int i = 0;i < heap_blocks_size;i += 2)
     {
-        if (heap_blocks[i] != NULL)
+        if (heap_blocks[i] != 0)
             printf("[%X %i] ", heap_blocks[i], heap_blocks[i + 1]);
     }
     printf("%s\n", i == -1 ? "(Too many addresses)" : "");

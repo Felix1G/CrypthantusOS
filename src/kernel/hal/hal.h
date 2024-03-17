@@ -47,7 +47,7 @@ typedef struct
 } KEY_STATE;
 
 void _hal_irq_idle(REGISTERS* regs);
-void _hal_isr_gpf(REGISTERS* regs); //general protection fault
+void _hal_isr_zdiv(REGISTERS* regs); //div zero
 
 void hal_init();
 void hal_shutdown();
@@ -60,6 +60,3 @@ int hal_keyboard_char();
 int hal_keyboard_up();
 void _hal_keyboard_irq_handler(REGISTERS* regs);
 void hal_keyboard_onpress(void (*listener)(int ch, int up, const KEY_STATE* state));
-
-void hal_run_user(void (*user_func)());
-void hal_switch_kernel();

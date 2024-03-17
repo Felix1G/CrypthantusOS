@@ -25,5 +25,5 @@ i686_gdt_load:
     mov     ss, ax
 
     mov     esp, ebp
-    pop     ebp,
+    pop     ebp
     ret

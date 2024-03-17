@@ -26,7 +26,8 @@ void __attribute__((cdecl)) main(uint16_t boot_drive)
         printf("An error occurred while initialising the disk. (FATAL)\n");
         return;
     }
-
+    g_boot_data.disk = disk;
+    
     printf("Initialising the FAT driver.\n");
 
     if (!fat_init(&disk))

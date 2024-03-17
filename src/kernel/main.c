@@ -33,7 +33,7 @@ void keyboard_listener(int ch, int up, const KEY_STATE* state)
 
 void user_func()
 {
-    //printf("No more doing weird stuff.");
+    printf("No more doing weird stuff.");
 }
 
 typedef struct 
@@ -79,9 +79,10 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
     }
 
     printf("[LOG]Initialising Heap.");
-    if (heap_init())
+    int heap_mem;
+    if (heap_mem = heap_init())
     {
-        printf("[LOG]Heap initiallised!");
+        printf("[LOG]Heap initialised. %iB allocated for the block addresses.", heap_mem);
     }
     else
     {
@@ -92,7 +93,7 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
     int block_size;
     char buffer[1024];
     char command[1024];
-    STACK* stack = stack_init(16 * 1024 * 1024, sizeof(unsigned));
+    STACK* stack = stack_init(16 * 1024, sizeof(unsigned));
     if (stack == NULL)
     {
         printf("[ERROR]Stack cannot be initialised.");

@@ -5,8 +5,8 @@
 
 STACK* stack_init(unsigned size, unsigned elem_size)
 {
-    int block_size;
-    void* alloc_ptr = buddy_alloc(size, block_size);
+    size_t block_size;
+    void* alloc_ptr = buddy_alloc(size, &block_size);
     size = block_size;
     if (!alloc_ptr)
         return 0;

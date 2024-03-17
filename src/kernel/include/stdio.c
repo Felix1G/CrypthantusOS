@@ -331,7 +331,7 @@ printf_begin:
     char_written = 0;
 
     int min_digit = 0;
-
+    
     while (*format)
     {
         char c = *format;

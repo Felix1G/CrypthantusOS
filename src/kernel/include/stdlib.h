@@ -12,7 +12,7 @@ int heap_init(); //1 success, 0 failed
 void* malloc(size_t size);
 
 //Zeroes the allocated memory.
-void* calloc(size_t nitems, size_t size);
+void* zmalloc(size_t size);
 
 //Change the size of the storage associated with the data.
 void* realloc(void* ptr, size_t size);

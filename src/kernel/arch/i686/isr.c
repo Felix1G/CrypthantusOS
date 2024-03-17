@@ -1,5 +1,6 @@
 #include "isr.h"
 #include "idt.h"
+#include <stddef.h>
 #include <stdio.h>
 
 ISR_HANDLER isr_handlers[256];
@@ -64,7 +65,8 @@ void __attribute__((cdecl)) i686_isr_handler(REGISTERS* regs)
         interrupt code - %u\n\
         error code     - %u\n\n\
         Register Values:\n\
-        eax=%u  ebx=%u  ecx=%u  edx=%u  esi=%u  edi=%u\n\
+        eax=%u  ebx=%u  ecx=%u\n\
+        edx=%u  esi=%u  edi=%u\n\
         esp=%u  ebp=%u  eip=%u  eflags=%u\n\
         cs=%u  ds=%u  ss=%u\n", 
         regs->intr, isr_exception_msg[regs->intr], regs->intr, regs->err, 

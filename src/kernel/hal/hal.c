@@ -1,4 +1,5 @@
 #include "hal.h"
+#include <util/buddy_alloc.h>
 
 void hal_init()
 {
@@ -10,7 +11,7 @@ void hal_init()
     
     printf("[LOG]Initialising Interrupt Service Routine.");
     i686_isr_init();
-    i686_isr_reg_handler(13, _hal_isr_gpf);
+    i686_isr_reg_handler(0, _hal_isr_zdiv);
 
     printf("[LOG]Initialising Interrupt Request.");
     i686_irq_reg_handler(0, _hal_irq_idle);
@@ -31,16 +32,6 @@ void hal_outb(int port, int value)
 int hal_io_wait_keyboard()
 {
     return i686_io_wait_keyboard();
-}
-
-void hal_run_user(void (*user_func)())
-{
-    //TODO
-}
-
-void hal_switch_kernel()
-{
-    //TODO
 }
 
 void hal_shutdown()
