@@ -17,31 +17,23 @@ void detect_memory(MEMORY_INFO* info);
 void __attribute__((cdecl)) main(uint16_t boot_drive)
 {
     clrscr();
-    
-    printf("Initialising the disk.\n");
 
+    printf("Initialising the disk.\n");
     DISK disk;
     if (!disk_init(&disk, boot_drive))
     {
         printf("An error occurred while initialising the disk. (FATAL)\n");
         return;
     }
-    g_boot_data.disk = disk;
     
-    printf("Initialising the FAT driver.\n");
-
+    printf("Initialising the Floppy Disk driver.\n");
     if (!fat_init(&disk))
     {
-        printf("An error occurred while initialising the FAT driver. (FATAL)\n");
+        printf("An error occurred while initialising the Floppy Disk driver. (FATAL)\n");
         return;
     }
 
-    printf("Finding the memory map.\n");
-    g_boot_data.boot_device = boot_drive;
-    detect_memory(&g_boot_data.memory);
-
     printf("Searching for kernel.\n");
-
     FAT_FILE* fat_file = fat_open(&disk, "/kernel.bin");
     if (fat_file == NULL)
     {
@@ -62,6 +54,13 @@ void __attribute__((cdecl)) main(uint16_t boot_drive)
 
     int scr_x, scr_y;
     screen_pos(&scr_x, &scr_y);
+
+    printf("Finding the memory map.\n");
+    detect_memory(&g_boot_data.memory);
+    
+    g_boot_data.boot_device = boot_drive;
+    g_boot_data.disk = disk;
+    fat_export_data(&g_boot_data.fat_data);
 
     KERNEL kernel = (KERNEL)kernel_program;
     kernel(scr_x, scr_y, &g_boot_data);

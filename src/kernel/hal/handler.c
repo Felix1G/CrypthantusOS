@@ -1,8 +1,7 @@
 #include "hal.h"
 #include <arch/i686/io.h>
+//#include <arch/i686/page.h>
 #include <stddef.h>
-
-void _hal_irq_idle(REGISTERS* regs) {}
 
 void (*g_keyboard_onpress_listener)(int ch, int up, const KEY_STATE* state) = NULL;
 
@@ -50,7 +49,7 @@ KEY_STATE g_key_state;
 int g_last_keyboard_char;
 int g_last_keyboard_up;
 
-void _hal_keyboard_irq_handler(REGISTERS* regs)
+void _hal_irq_keyboard(REGISTERS* regs)
 {
     int ch = i686_io_keyboard_read();
     
@@ -110,3 +109,23 @@ void _hal_isr_zdiv(REGISTERS* regs)
     printf("[ERROR]Division by Zero.");
     i686_panic();
 }
+
+/*extern uint32_t __kernel_end;
+void _hal_irq_page_fault(REGISTERS* regs)
+{
+    if ((regs->err & 0b111) == 0b000)
+    { //supervisory process tried to read a non-present page entry, create an entry
+        uint32_t* page_table __attribute__((aligned(4096)));
+        size_t block_size;
+        page_table = (uint32_t*)buddy_alloc(4096, &block_size);
+
+        i686_page_table(page_table, 1);
+        i686_page_enable();
+        //page_table[0] = i686_cr2();
+    }
+    else
+    {
+        printf("[ERROR]: #PF Unhandled Error Code. (0x%8X)", regs->err);
+        i686_panic();
+    }
+}*/

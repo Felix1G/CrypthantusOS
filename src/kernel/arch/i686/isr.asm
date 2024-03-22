@@ -44,6 +44,7 @@ isr_com:
 
     popa
     add     esp, 8          ; remove err code and intr num
+
     iret
 
 global i686_panic

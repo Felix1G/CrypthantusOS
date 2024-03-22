@@ -453,7 +453,7 @@ scanf_repeat_keyboard_loop:
 
     //wait until an enter is pressed, then read the input
     while (true) {
-        hal_io_wait_keyboard();
+        //hal_io_wait_keyboard();
         if (!hal_keyboard_up() && hal_keyboard_char() == '\n')
             break;
     }

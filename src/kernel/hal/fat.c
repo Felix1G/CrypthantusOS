@@ -1,24 +1,56 @@
 #include <stdint.h>
-#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdtype.h>
+#include <boot/bootlib.h>
 #include "fat.h"
-#include "string.h"
-#include "stdio.h"
-#include "stdtype.h"
+#include <arch/i686/io.h>
+#include <arch/i686/floppy.h>
 
-static FAT_DRIVER *driver;
-static uint8_t *fat = NULL;
-static uint32_t data_lba; //data section
-
-void fat_export_data(FAT_DATA* data)
+/*enum FLOPPY_REGISTERS
 {
-    data->driver = driver;
-    data->fat = fat;
-    data->data_lba = data_lba;
-}
+   FLOPPY_REG_STATUS_A                  = 0x3F0, // read-only
+   FLOPPY_REG_STATUS_B                  = 0x3F1, // read-only
+   FLOPPY_REG_DIGITAL_OUT               = 0x3F2,
+   FLOPPY_REG_TAPE_DRIVE                = 0x3F3,
+   FLOPPY_REG_MAIN_STATUS               = 0x3F4, // read-only
+   FLOPPY_REG_DATA_RATE_SELECT          = 0x3F4, // write-only
+   FLOPPY_DATA_FIFO                     = 0x3F5,
+   FLOPPY_REG_DIGITAL_IN                = 0x3F7, // read-only
+   FLOPPY_CONF_CONTROl                  = 0x3F7 // write-only
+};*/
+
+static FAT_DRIVER *g_driver;
+static uint8_t *g_fat = NULL;
+static uint32_t g_data_lba; //data section
+
+//remove disk if disk is not needed
+/*int read_sectors(DISK* disk, uint32_t lba, uint8_t sectors, void *data)
+{
+    for (int i = 0; i < sectors; i++)
+    {
+        //set lba
+        i686_outb(0x3F2, 1); //sector count
+        i686_outb(0x3F3, lba);
+        i686_outb(0x3F4, lba >> 8);
+        i686_outb(0x3F5, lba >> 16);
+        i686_outb(0x3F6, (lba >> 24) | 0xE0);
+
+        //issue read sectors command
+        i686_outb(0x3F7, 0x20);
+        
+        i686_insl(0x3F0, data, 128);
+    }
+
+    return 1;
+}*/
 
 unsigned cluster_to_lba(unsigned cluster)
 {
-    return data_lba + (cluster - 2)  *driver->bs_t.boot_sector.cluster_sectors;
+    return g_data_lba + (cluster - 2)  *g_driver->bs_t.boot_sector.cluster_sectors;
 }
 
 unsigned fat_next_cluster(unsigned current_cluster)
@@ -26,9 +58,9 @@ unsigned fat_next_cluster(unsigned current_cluster)
     unsigned idx = current_cluster  *3 / 2;
 
     if (current_cluster % 2 == 0)
-        return (*(uint16_t*)(fat + idx)) & 0x0FFF;
+        return (*(uint16_t*)(g_fat + idx)) & 0x0FFF;
     else
-        return (*(uint16_t*)(fat + idx)) >> 4;
+        return (*(uint16_t*)(g_fat + idx)) >> 4;
 }
 
 
@@ -37,17 +69,17 @@ FAT_FILE *fat_open_entry(DISK *disk, FAT_DIR_ENTRY *entry)
     int handle = -1;
     for (int i = 0;i < MAX_FILE_HANDLE && handle < 0;i++)
     {
-        if (!driver->opened_files[i].opened)
+        if (!g_driver->opened_files[i].opened)
             handle = i;
     }
 
     if (handle < 0)
     {
         printf("FAT Driver: out of file handles.");
-        return false;
+        return 0;
     }
 
-    FAT_FILE_DESC *file_desc = &driver->opened_files[handle];
+    FAT_FILE_DESC *file_desc = &g_driver->opened_files[handle];
     file_desc->file.handle = handle;
     file_desc->file.is_dir = (entry->attribute & FILE_ATTR_DIRECTORY) != 0;
     file_desc->file.pos = 0;
@@ -56,17 +88,17 @@ FAT_FILE *fat_open_entry(DISK *disk, FAT_DIR_ENTRY *entry)
     file_desc->cur_cluster = file_desc->first_cluster;
     file_desc->cur_sector_in_cluster = 0;
     
-    if (!disk_read_sectors(disk, cluster_to_lba(file_desc->cur_cluster), 1, file_desc->buffer))
+    if (i686_floppy_read_sector(disk, FLOPPY_STANDARD_BASE, cluster_to_lba(file_desc->cur_cluster), file_desc->buffer))
     {
         printf("FAT Driver: read failure.\r\n");
-        return false;
+        return 0;
     }
 
-    file_desc->opened = true;
+    file_desc->opened = 1;
     return &file_desc->file;
 }
 
-bool fat_find_file(DISK *disk, FAT_FILE *file, const char *name, FAT_DIR_ENTRY *entry)
+int fat_find_file(DISK *disk, FAT_FILE *file, const char *name, FAT_DIR_ENTRY *entry)
 {
     char fat_name[12];
 
@@ -99,71 +131,18 @@ bool fat_find_file(DISK *disk, FAT_FILE *file, const char *name, FAT_DIR_ENTRY *
         if (!memcmp(fat_name, file_entry.name, 11))
         {
             *entry = file_entry;
-            return true;
+            return 1;
         }
     }
 
-    return false;
+    return 0;
 }
 
-int fat_init(DISK *disk)
+void fat_init(FAT_DATA* data)
 {
-    uint32_t fat_size;
-    uint32_t root_dir_lba;
-    uint32_t root_dir_size;
-    int index;
-
-    driver = (FAT_DRIVER*) MEMORY_FAT_ADDR;
-    
-    if (!disk_read_sectors(disk, 0, 1, driver->bs_t.boot_sector_bytes))
-    {
-        printf("FAT Driver: read boot sector failed.\r\n");
-        return false;
-    }
-
-    fat = (uint8_t*)driver + sizeof(FAT_DRIVER);
-    fat_size = driver->bs_t.boot_sector.sector_bytes  *driver->bs_t.boot_sector.fat_sectors;
-    
-    if (sizeof(FAT_DRIVER) + fat_size >= MEMORY_FAT_SIZE)
-    {
-        printf("FAT Driver: not enough memory to read FAT. Required memory: %lu, but only have %u\r\n", 
-            sizeof(FAT_DRIVER) + fat_size, MEMORY_FAT_SIZE);
-        return false;
-    }
-
-    if (!disk_read_sectors(disk, driver->bs_t.boot_sector.res_sectors, driver->bs_t.boot_sector.fat_sectors, fat))
-    {
-        printf("FAT Driver: failed to read FAT.\r\n");
-        return false;
-    }
-
-    root_dir_lba = driver->bs_t.boot_sector.res_sectors + driver->bs_t.boot_sector.fat_sectors  *driver->bs_t.boot_sector.fats;
-    root_dir_size = sizeof(FAT_DIR_ENTRY)  *driver->bs_t.boot_sector.dir_entries;
-
-    driver->root_dir.file.handle = ROOT_DIR_HANDLE;
-    driver->root_dir.file.is_dir = true;
-    driver->root_dir.file.pos = 0;
-    driver->root_dir.file.size = root_dir_size;
-    driver->root_dir.opened = true;
-    driver->root_dir.first_cluster = root_dir_lba;
-    driver->root_dir.cur_cluster = root_dir_lba;
-    driver->root_dir.cur_sector_in_cluster = 0;
-
-    if (!disk_read_sectors(disk, root_dir_lba, 1, driver->root_dir.buffer))
-    {
-        printf("FAT Driver: failed to read root directory.\r\n");
-        return false;
-    }
-
-    data_lba = root_dir_lba + 
-            (root_dir_size + driver->bs_t.boot_sector.sector_bytes - 1) / 
-                    driver->bs_t.boot_sector.sector_bytes;
-
-    //reset opened files
-    for (index = 0; index < MAX_FILE_HANDLE; index++)
-        driver->opened_files[index].opened = false;
-
-    return true;
+    g_driver = data->driver;
+    g_fat = data->fat;
+    g_data_lba = data->data_lba;
 }
 
 FAT_FILE *fat_open(DISK *disk, const char *path)
@@ -173,10 +152,10 @@ FAT_FILE *fat_open(DISK *disk, const char *path)
     if (path[0] == '/')
         path++;
     
-    FAT_FILE *current = &driver->root_dir.file;
+    FAT_FILE *current = &g_driver->root_dir.file;
 
     while (*path) {
-        bool is_last = false;
+        int is_last = 0;
         const char *delim = strchr(path, '/');
 
         if (delim != NULL)
@@ -191,7 +170,7 @@ FAT_FILE *fat_open(DISK *disk, const char *path)
             memcpy(name, path, len);
             name[len] = '\0';
             path += len;
-            is_last = true;
+            is_last = 1;
         }
         
         FAT_DIR_ENTRY entry;
@@ -223,8 +202,8 @@ unsigned fat_read(DISK *disk, FAT_FILE *file, unsigned n, void *data)
 {
     FAT_FILE_DESC *file_desc = 
         (file->handle == ROOT_DIR_HANDLE) ? 
-            &driver->root_dir : 
-            &driver->opened_files[file->handle];
+            &g_driver->root_dir : 
+            &g_driver->opened_files[file->handle];
 
     uint8_t *data_8t = (uint8_t*)data;
 
@@ -241,7 +220,7 @@ unsigned fat_read(DISK *disk, FAT_FILE *file, unsigned n, void *data)
         data_8t += copy_size;
         file_desc->file.pos += copy_size;
         n -= copy_size;
-
+        
         //check for more data to read
         if (left == copy_size)
         {
@@ -249,7 +228,7 @@ unsigned fat_read(DISK *disk, FAT_FILE *file, unsigned n, void *data)
             {
                 file_desc->cur_cluster++;
                 
-                if (!disk_read_sectors(disk, file_desc->cur_cluster, 1, file_desc->buffer))
+                if (i686_floppy_read_sector(disk, FLOPPY_STANDARD_BASE, file_desc->cur_cluster, file_desc->buffer))
                 {
                     printf("FAT Driver: failed to read root directory.\r\n");
                     break;
@@ -257,7 +236,7 @@ unsigned fat_read(DISK *disk, FAT_FILE *file, unsigned n, void *data)
             }
             else
             {
-                if (++file_desc->cur_sector_in_cluster >= driver->bs_t.boot_sector.cluster_sectors)
+                if (++file_desc->cur_sector_in_cluster >= g_driver->bs_t.boot_sector.cluster_sectors)
                 {
                     file_desc->cur_sector_in_cluster = 0;
                     file_desc->cur_cluster = fat_next_cluster(file_desc->cur_cluster);
@@ -270,7 +249,7 @@ unsigned fat_read(DISK *disk, FAT_FILE *file, unsigned n, void *data)
                     break;
                 }
 
-                if (!disk_read_sectors(disk, cluster_to_lba(file_desc->cur_cluster) + file_desc->cur_sector_in_cluster, 1, file_desc->buffer))
+                if (i686_floppy_read_sector(disk, FLOPPY_STANDARD_BASE, cluster_to_lba(file_desc->cur_cluster) + file_desc->cur_sector_in_cluster, file_desc->buffer))
                 {
                     printf("FAT Driver: error occurred while reading.\r\n");
                     break;
@@ -282,7 +261,7 @@ unsigned fat_read(DISK *disk, FAT_FILE *file, unsigned n, void *data)
     return data_8t - (uint8_t*)data;
 }
 
-bool fat_entry(DISK *disk, FAT_FILE *file, FAT_DIR_ENTRY *entry)
+int fat_entry(DISK *disk, FAT_FILE *file, FAT_DIR_ENTRY *entry)
 {
     return fat_read(disk, file, sizeof(FAT_DIR_ENTRY), entry) == sizeof(FAT_DIR_ENTRY);
 }
@@ -292,10 +271,10 @@ void fat_close(FAT_FILE *file)
     if (file->handle == ROOT_DIR_HANDLE)
     {
         file->pos = 0;
-        driver->root_dir.cur_cluster = driver->root_dir.first_cluster;
+        g_driver->root_dir.cur_cluster = g_driver->root_dir.first_cluster;
     }
     else
     {
-        driver->opened_files[file->handle].opened = false;
+        g_driver->opened_files[file->handle].opened = 0;
     }
 }

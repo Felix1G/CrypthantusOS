@@ -8,8 +8,8 @@
 #include "util/buddy_alloc.h"
 #include <boot/bootlib.h>
 
-extern uint8_t __bss_start;
-extern uint8_t __end;
+extern uint32_t __bss_start;
+extern uint32_t __kernel_end;
 
 void keyboard_listener(int ch, int up, const KEY_STATE* state)
 {
@@ -58,12 +58,13 @@ TEST_STRUCT* init_test_struct(int rand)
 
 void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOOT_DATA* boot_data)
 {
-    memset(&__bss_start, 0, (&__end) - (&__bss_start));
+    memset(&__bss_start, 0, (&__kernel_end) - (&__bss_start));
     set_screen_pos(scr_x, scr_y);
 
     printf("[LOG]Initialising HAL.");
     hal_init();
     hal_keyboard_onpress(keyboard_listener);
+    printf("[LOG]HAL initialised.");
 
     printf("[LOG]Initialising Buddy Allocator.");
     int buddy_mem;
@@ -90,16 +91,32 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
         goto end;
     }
 
+    /*printf("[LOG]Initialising Page Directory.");
+    hal_page_init();
+    printf("[LOG]Page Directory Initialised.");*/
+
+    printf("[LOG]Initialising Floppy Disk Driver.");
+    if (hal_disk_init(&boot_data->fat_data, &boot_data->disk, 0))
+    {
+        printf("[LOG]Floppy Disk Driver initialisation failed.");
+        goto end;
+    }
+    else
+    {
+        printf("[LOG]Floppy Disk Driver initialised.");
+    }
+
     int block_size;
     char buffer[1024];
     char command[1024];
     STACK* stack = stack_init(16 * 1024, sizeof(unsigned));
     if (stack == NULL)
     {
-        printf("[ERROR]Stack cannot be initialised.");
+        printf("[DEBUG]Stack cannot be initialised.");
         goto end;
     }
-
+    
+    printf("[LOG]Commands available.");
     while (true) {
         *buffer = '\0';
         
@@ -169,7 +186,24 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
             else {
                 stack_push(stack, p);
                 printf("0x%X\n", (unsigned)p);
+                for (int i = 0;i < 1000;i++)
+                    p[i * 1024] = 123;
                 _heap_debug();
+            }
+        }
+        else if (!strcmp(command, "try3"))
+        {
+            FAT_FILE* fat_file = fat_open(&boot_data->disk, "dir/inner/test.txt");
+            if (fat_file != NULL)
+            {
+                uint32_t read;
+                char* buffer = (char*)malloc(15100);
+                while ((read = fat_read(&boot_data->disk, fat_file, 15000, buffer)))
+                {
+                    buffer[read] = '\0';
+                    printf(buffer);
+                }
+                fat_close(fat_file);
             }
         }
         else if (!strcmp(command, "memmap"))

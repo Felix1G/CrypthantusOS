@@ -1,12 +1,10 @@
 #pragma once
 
+#include "fat.h"
 #include <stdbool.h>
 #include <stdio.h>
-#include <arch/i686/gdt.h>
-#include <arch/i686/idt.h>
 #include <arch/i686/isr.h>
-#include <arch/i686/irq.h>
-#include <arch/i686/io.h>
+#include <util/buddy_alloc.h>
 
 #define KEY_LSHIFT      0x80
 #define KEY_RSHIFT      0x81
@@ -46,7 +44,6 @@ typedef struct
     bool alt;
 } KEY_STATE;
 
-void _hal_irq_idle(REGISTERS* regs);
 void _hal_isr_zdiv(REGISTERS* regs); //div zero
 
 void hal_init();
@@ -55,8 +52,13 @@ void hal_shutdown();
 int hal_inb(int port);
 void hal_outb(int port, int value);
 
+void _hal_irq_keyboard(REGISTERS* regs);
 int hal_io_wait_keyboard(); //returns the character read after waiting
 int hal_keyboard_char();
 int hal_keyboard_up();
-void _hal_keyboard_irq_handler(REGISTERS* regs);
 void hal_keyboard_onpress(void (*listener)(int ch, int up, const KEY_STATE* state));
+
+int hal_disk_init(FAT_DATA* data, DISK* disk, int test_read);
+
+//void hal_page_init();
+//void _hal_irq_page_fault(REGISTERS* regs);

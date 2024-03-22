@@ -1,9 +1,8 @@
 ENTRY(main)
 OUTPUT_FORMAT("binary")
-physical = 0x00100000;
 
 SECTIONS {
-    . = physical;
+    . = 0x00100000;
     
     .entry      : { __entry_start = .;      *(.entry)   }
     .text       : { __text_start = .;       *(.text)    }
@@ -11,5 +10,5 @@ SECTIONS {
     .rodata     : { __rodata_start = .;     *(.rodata)  }
     .bss        : { __bss_start = .;        *(.bss)     }
 
-    __end = .;
+    __kernel_end = .;
 }

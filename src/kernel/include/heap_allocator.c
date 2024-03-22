@@ -315,7 +315,7 @@ void* realloc(void* ptr, size_t size)
     heapc->block = heap_mem_block((szpt)real_ptr);
     heapc->prev_free_ptr = (szpt)&heapc->free_root;
     heapc->free_ptr = (szpt)*heapc->prev_free_ptr;
-    while (heap_in_mem_block(heapc->free_ptr) && (void*)heapc->free_ptr < real_ptr)
+    while (heap_not_in_mem_block(heapc->free_ptr) || (void*)heapc->free_ptr < real_ptr)
     {
         heapc->prev_free_ptr = (szpt)*heapc->prev_free_ptr;
         heapc->free_ptr = (szpt)*heapc->prev_free_ptr;
@@ -325,6 +325,7 @@ void* realloc(void* ptr, size_t size)
         heapc->avail_size = (void*)(szpt)*heapc->alloc_ptr - (void*)real_ptr;
     else
         heapc->avail_size = (void*)heap_mem_block_end(heapc->block) - (void*)real_ptr;
+    
     if (heapc->avail_size > size + heap_header_size)
     { //extend the free header
         size += heap_header_size; //add by header size

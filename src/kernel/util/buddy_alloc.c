@@ -2,11 +2,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define BUDDY_LAYERS 13
+#define BUDDY_LAYERS 14
 #define BUDDY_ARRAY_SIZE (1 << BUDDY_LAYERS) >> 3
 
-int buddy_layers[BUDDY_LAYERS] = { //extra one for the loop in alloc
-    0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095//, 8191, 16383, 32767
+int buddy_layers[16] = { //extra one for the loop in alloc
+    0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383, 32767
 };
 
 uint8_t g_buddy_block[BUDDY_ARRAY_SIZE];
@@ -71,7 +71,7 @@ int buddy_init(BOOT_DATA* boot_data)
         //safely allocate the memory at the end of the memory block
         //to avoid collision with the kernel's opcodes
         g_buddy_start = (void*)(size_t)(begin->begin + begin->length + 1 - g_buddy_max_block); 
-
+        
         return g_buddy_max_block;
     }
 
