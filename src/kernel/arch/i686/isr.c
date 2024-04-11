@@ -50,29 +50,55 @@ void i686_isr_init()
     for (int i = 0;i < 256;i++)
         i686_idt_set_present_flag(i);
 
-    i686_idt_unset_present_flag(0x80);
+    i686_idt_unset_present_flag(0x88);
+}
+
+volatile int recent_intr = 0;
+volatile int is_keyboard_intr = 0;
+
+void i686_isr_reset_keyboard_intr()
+{
+    is_keyboard_intr = 0;
+}
+
+int i686_isr_get_keyboard_intr()
+{
+    return is_keyboard_intr;
+}
+
+int i686_isr_recent_interrupt()
+{
+    return recent_intr == 33; //hardcoded value :(
 }
 
 void __attribute__((cdecl)) i686_isr_handler(REGISTERS* regs)
 {
+    recent_intr = regs->intr;
+    if (recent_intr == 33)
+        is_keyboard_intr = 1;
+
     if (isr_handlers[regs->intr] != NULL)
         isr_handlers[regs->intr](regs);
     else if (regs->intr >= 32)
-        printf("[ERROR] Unhandled Interrupt %u.\n", regs->intr);
+        printf("[ERROR]Unhandled Interrupt %u.\n", regs->intr);
     else
     {
-        printf("[ERROR] Unhandled Exception %u: %s.\n\n\
+        printf("[ERROR]Unhandled Exception %u: %s.\n\n\
         interrupt code - %u\n\
         error code     - %u\n\n\
         Register Values:\n\
-        eax=%u  ebx=%u  ecx=%u\n\
-        edx=%u  esi=%u  edi=%u\n\
-        esp=%u  ebp=%u  eip=%u  eflags=%u\n\
-        cs=%u  ds=%u  ss=%u\n", 
+        eax=0x%X  ebx=0x%X  ecx=0x%X\n\
+        edx=0x%X  esi=0x%X  edi=0x%X\n\
+        esp=0x%X  ebp=0x%X  eip=0x%X  eflags=0x%X\n\
+        cr0=0x%X  cr2=0x%X  cr3=0x%X  cr4=0x%X\n\
+        cs=0x%X  ds=0x%X  es=0x%X\n\
+        fs=0x%X  gs=0x%X  ss=0x%X\n", 
         regs->intr, isr_exception_msg[regs->intr], regs->intr, regs->err, 
         regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi,
         regs->esp, regs->ebp, regs->eip, regs->eflags,
-        regs->cs, regs->ds, regs->ss);
+        regs->cr0, regs->cr2, regs->cr3, regs->cr4,
+        regs->cs, regs->ds, regs->es,
+        regs->fs, regs->gs, regs->ss);
 
         i686_panic();
     }

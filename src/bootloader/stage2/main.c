@@ -3,10 +3,13 @@
 #include "disk.h"
 #include "stdio.h"
 #include "string.h"
+#include "page.h"
 #include "x86.h"
 #include <boot/bootlib.h>
 
 BOOT_DATA g_boot_data;
+static uint32_t start_page_table[1024] __attribute__((aligned(4096)));
+static uint32_t kernel_page_table[1024] __attribute__((aligned(4096)));
 
 typedef void __attribute__((cdecl)) (*KERNEL)(int, int, BOOT_DATA*);
 uint8_t* kernel_program = (uint8_t*) MEMORY_KERNEL_ADDR;
@@ -32,6 +35,9 @@ void __attribute__((cdecl)) main(uint16_t boot_drive)
         printf("An error occurred while initialising the Floppy Disk driver. (FATAL)\n");
         return;
     }
+    g_boot_data.boot_device = boot_drive;
+    g_boot_data.disk = disk;
+    fat_export_data(&g_boot_data.fat_data);
 
     printf("Searching for kernel.\n");
     FAT_FILE* fat_file = fat_open(&disk, "/kernel.bin");
@@ -49,20 +55,30 @@ void __attribute__((cdecl)) main(uint16_t boot_drive)
         kernel_prog_pos += read;
     }
     fat_close(fat_file);
+    
+    printf("Finding the memory map.\n");
+    detect_memory(&g_boot_data.memory);
+    
+    printf("Initialising and enabling paging.\n");
+    page_init();
+
+    for (int i = 0;i < 256;i++) //until 0xFFFFF
+        start_page_table[i] = (i * 0x1000) | PAGE_READ_WRITE | PAGE_PRESENT;
+    page_table(start_page_table, 0, PAGE_ALL_ACCESS);
+
+    uint32_t kernel_addr = (uint32_t)kernel_program & 0xFFFFF000;
+    for (int i = 0;i < 1024;i++)
+        kernel_page_table[i] = ((uint32_t)kernel_addr + i * 0x1000) | PAGE_READ_WRITE | PAGE_PRESENT;
+    page_table(kernel_page_table, 768, 0);
+
+    page_enable();
 
     printf("Starting kernel.\n");
 
     int scr_x, scr_y;
     screen_pos(&scr_x, &scr_y);
 
-    printf("Finding the memory map.\n");
-    detect_memory(&g_boot_data.memory);
-    
-    g_boot_data.boot_device = boot_drive;
-    g_boot_data.disk = disk;
-    fat_export_data(&g_boot_data.fat_data);
-
-    KERNEL kernel = (KERNEL)kernel_program;
+    KERNEL kernel = (KERNEL)0xC0000000;
     kernel(scr_x, scr_y, &g_boot_data);
 }
 

@@ -25,6 +25,20 @@ isr_com:
     xor     eax, eax
     mov     ax, ds
     push    eax
+    mov     ax, es
+    push    eax
+    mov     ax, fs
+    push    eax
+    mov     ax, gs
+    push    eax
+    mov     eax, cr0
+    push    eax
+    mov     eax, cr2
+    push    eax
+    mov     eax, cr3
+    push    eax
+    mov     eax, cr4
+    push    eax
 
     mov     ax, 0x10        ; use data segment
     mov     ds, ax
@@ -37,10 +51,21 @@ isr_com:
     add     esp, 4
 
     pop     eax
-    mov     ds, ax
-    mov     es, ax
-    mov     fs, ax
-    mov     gs, ax
+    mov     cr4, eax
+    pop     eax
+    mov     cr3, eax
+    pop     eax
+    mov     cr2, eax
+    pop     eax
+    mov     cr0, eax
+    pop     eax
+    mov     gs, eax
+    pop     eax
+    mov     fs, eax
+    pop     eax
+    mov     es, eax
+    pop     eax
+    mov     ds, eax
 
     popa
     add     esp, 8          ; remove err code and intr num

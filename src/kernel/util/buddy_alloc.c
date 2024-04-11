@@ -1,9 +1,12 @@
 #include "buddy_alloc.h"
+#include "hal/hal.h"
 #include <stdint.h>
 #include <stdio.h>
 
 #define BUDDY_LAYERS 14
 #define BUDDY_ARRAY_SIZE (1 << BUDDY_LAYERS) >> 3
+#define BUDDY_PAGE_TABLES 256
+#define TOTAL_PAGE_MAPPABLE_SIZE (4 * 1024 * 1024)
 
 int buddy_layers[16] = { //extra one for the loop in alloc
     0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095, 8191, 16383, 32767
@@ -32,7 +35,9 @@ void buddy_block_set(int layer, int idx, int val)
 int g_buddy_max_block;
 int g_buddy_min_block;
 int g_buddy_layers;
-void* g_buddy_start;
+void* g_buddy_start; //NOTE: this is in physical address
+
+static uint32_t g_buddy_page_tables[1024 * BUDDY_PAGE_TABLES] __attribute__((aligned(4096)));
 
 int buddy_init(BOOT_DATA* boot_data)
 {
@@ -70,7 +75,20 @@ int buddy_init(BOOT_DATA* boot_data)
 
         //safely allocate the memory at the end of the memory block
         //to avoid collision with the kernel's opcodes
-        g_buddy_start = (void*)(size_t)(begin->begin + begin->length + 1 - g_buddy_max_block); 
+        g_buddy_start = (void*)((size_t)(begin->begin + 
+            begin->length + 1 - g_buddy_max_block) & 0xFFFFF000); //align at 4096 bytes
+
+        int index = 0;
+        for (int i = 0; i < g_buddy_max_block; i += TOTAL_PAGE_MAPPABLE_SIZE)
+        {
+            size_t block_size = 0;
+            //starting at virtual address 0x80000000
+            uint32_t table_phys = hal_physical_addr((uint32_t)(g_buddy_page_tables + (index * 1024)));
+            hal_set_page_table((uint32_t*)table_phys, 512 + index, 0);
+            //put the tables into an identity map
+            hal_set_page_table_entry(hal_get_page_table(0), (table_phys >> 12) & 0x3FF, table_phys, 0, 0);
+            index += 1;
+        }
         
         return g_buddy_max_block;
     }
@@ -90,7 +108,7 @@ void *buddy_alloc(size_t size, size_t* block_size)
     
     int min_layer = g_buddy_layers - 1;
     int min_block_size = g_buddy_min_block;
-    while (size > min_block_size)
+    while (min_block_size < size)
     {
         min_block_size <<= 1;
         min_layer--;
@@ -143,7 +161,17 @@ buddy_alloc_loop:
             { //block to allocate found
                 buddy_block_set(layer, idx, 1);
                 *block_size = g_buddy_min_block << (g_buddy_layers - layer - 1);
-                return (void*)(min_block_size * idx + g_buddy_start);
+                
+                int address_size = (g_buddy_min_block << (g_buddy_layers - min_layer - 1));
+                size_t address = (address_size) * idx;
+                for (int i = 0; i < address_size; i += 4096)
+                { //g_buddy_page_tables itself is already aligned with the buddy allocator
+                    hal_set_page_table_entry(g_buddy_page_tables + (address >> 22 << 10), ((address >> 12) & 0x3FF),
+                        address + (size_t)g_buddy_start, 0, 0); //address uses physical address
+                    address += 4096;
+                }
+
+                return (void*)((size_t)min_block_size * (size_t)idx + BUDDY_ALLOC_VIRADR); //return the virtual address
             }
             else
             { //move deeper
@@ -167,7 +195,7 @@ buddy_alloc_loop:
         else {
             buddy_block_set(0, 0, 1);
             *block_size = g_buddy_max_block;
-            return g_buddy_start;
+            return (void*)BUDDY_ALLOC_VIRADR;
         }
     }
     else
@@ -183,7 +211,7 @@ void buddy_free(void *ptr)
     if (!ptr)
         return; //NULL case
 
-    size_t min_block_idx = ((char*)ptr - (char*)g_buddy_start) / g_buddy_min_block;
+    size_t min_block_idx = ((char*)ptr - (char*)BUDDY_ALLOC_VIRADR) / g_buddy_min_block;
     
     int layer = g_buddy_layers - 1;
     while (!buddy_block(layer, min_block_idx))
@@ -201,5 +229,14 @@ void buddy_free(void *ptr)
         layer--;
         min_block_idx >>= 1;
         buddy_block_set(layer, min_block_idx, 0);
+    }
+
+    int address_size = (g_buddy_min_block << (g_buddy_layers - layer - 1));
+    size_t address = (address_size) * min_block_idx;
+    for (int i = 0; i < address_size; i += 4096)
+    { //g_buddy_page_tables itself is already aligned with the buddy allocator
+        hal_set_page_table_entry(g_buddy_page_tables + (address >> 22 << 10),
+            ((address >> 12) & 0x3FF), 0x00, 0, 0); //address uses physical address
+        address += 4096;
     }
 }

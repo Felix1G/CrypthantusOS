@@ -11,7 +11,7 @@ IRQ_HANDLER irq_handlers[16];
 void i686_irq_handler(REGISTERS* regs)
 {
     int irq = regs->intr - PIC_REMAP_OFFSET;
-
+    
     uint8_t pic_isr = i686_pic_read_isr();
     uint8_t pic_irr = i686_pic_read_irr();
 
@@ -27,12 +27,29 @@ void i686_irq_handler(REGISTERS* regs)
     i686_pic_send_eoi(irq);
 }
 
+void i686_reg_pic_send_eoi(REGISTERS* regs)
+{
+    int irq = regs->intr - PIC_REMAP_OFFSET;
+    i686_pic_send_eoi(irq);
+}
+
 #define MS_PER_IDLE_TICK (50)
 
+PREEMPT_HANDLER preempt_handler = NULL;
 volatile int idle_ticks = 0;
+volatile int ticks = 0;
 
 void irq_idle(REGISTERS* regs) { //called once every 50ms, 20tps
     idle_ticks--;
+    ticks++;
+    
+    if (preempt_handler != NULL)
+    {
+        i686_disable_interrupt();
+        if (preempt_handler(regs, ticks))
+            ticks = 0;
+        i686_enable_interrupt();
+    }
 }
 
 void i686_sleep(int ms)
@@ -91,10 +108,15 @@ void i686_irq_init()
         i686_isr_reg_handler(PIC_REMAP_OFFSET + i, i686_irq_handler);
     i686_irq_reg_handler(0, irq_idle);
 
-    i686_enable_interrupts();
+    i686_enable_interrupt();
 }
 
 void i686_irq_reg_handler(int irq, IRQ_HANDLER handler)
 {
     irq_handlers[irq] = handler;
+}
+
+void i686_preempt_handler(PREEMPT_HANDLER handler)
+{
+    preempt_handler = handler;
 }

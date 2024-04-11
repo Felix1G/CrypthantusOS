@@ -31,10 +31,8 @@ void keyboard_listener(int ch, int up, const KEY_STATE* state)
         putc(ch);
 }
 
-void user_func()
-{
-    printf("No more doing weird stuff.");
-}
+extern int user_func();
+extern int user_func2();
 
 typedef struct 
 {
@@ -66,6 +64,9 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
     hal_keyboard_onpress(keyboard_listener);
     printf("[LOG]HAL initialised.");
 
+    printf("[LOG]Initialising Paging.");
+    hal_page_init();
+
     printf("[LOG]Initialising Buddy Allocator.");
     int buddy_mem;
     if (buddy_mem = buddy_init(boot_data))
@@ -90,10 +91,6 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
         printf("[ERROR]Heap initialisation failed. Kernel ends here.");
         goto end;
     }
-
-    /*printf("[LOG]Initialising Page Directory.");
-    hal_page_init();
-    printf("[LOG]Page Directory Initialised.");*/
 
     printf("[LOG]Initialising Floppy Disk Driver.");
     if (hal_disk_init(&boot_data->fat_data, &boot_data->disk, 0))
@@ -176,6 +173,22 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
                 printf("NULL\n");
             }
         }
+        else if (!strcmp(command, "try4"))
+        {
+            int size = 0;
+            scanf("%d", &size);
+            unsigned* a = (unsigned*)stack_pop(stack);
+            unsigned* b = (unsigned*)stack_pop(stack);
+            if (b) {
+                *b = realloc((void*)*b, size);
+                stack_push(stack, *b);
+                stack_push(stack, *a);
+                printf("0x%X\n", *b);
+                _heap_debug();
+            } else {
+                printf("NULL\n");
+            }
+        }
         else if (!strcmp(command, "try2"))
         {
             int size = 0;
@@ -184,10 +197,11 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
             if (p == NULL)
                 printf("NULL\n");
             else {
+                printf("0x%X\n", (unsigned)p);
                 stack_push(stack, p);
                 printf("0x%X\n", (unsigned)p);
-                for (int i = 0;i < 1000;i++)
-                    p[i * 1024] = 123;
+                //for (int i = 0;i < 1000;i++)
+                 //   p[i * 1024] = 123;
                 _heap_debug();
             }
         }
@@ -204,6 +218,21 @@ void __attribute__((section(".entry"))) main(uint32_t scr_x, uint32_t scr_y, BOO
                     printf(buffer);
                 }
                 fat_close(fat_file);
+                free(buffer);
+            }
+        }
+        else if (!strcmp(command, "m"))
+        {
+            if (!hal_create_user_process(user_func, 0))
+            {
+                printf("Run Failed!");
+            }
+        }
+        else if (!strcmp(command, "n"))
+        {
+            if (!hal_create_user_process(user_func2, 1))
+            {
+                printf("Run Failed!");
             }
         }
         else if (!strcmp(command, "memmap"))

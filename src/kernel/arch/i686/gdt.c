@@ -1,5 +1,7 @@
 #include "io.h"
 #include "gdt.h"
+#include "tss.h"
+#include "page.h"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -72,6 +74,7 @@ typedef enum
 
 static GDT_ENTRY gdt_entry[6] = {
     GDT_ENTRY(0, 0, 0, 0), //null descriptor
+
     //ring 0 descriptor
     GDT_ENTRY(0, 0xFFFFF,
               GDT_ACCESS_PRESENT | GDT_ACCESS_RING0 | 
@@ -81,6 +84,19 @@ static GDT_ENTRY gdt_entry[6] = {
               GDT_ACCESS_PRESENT | GDT_ACCESS_RING0 | 
               GDT_ACCESS_DATA_SEG | GDT_ACCESS_DATA_WRITE | GDT_ACCESS_ACCESSED_BIT,
               GDT_FLAG_32_BIT | GDT_FLAG_GRANULARITY_4K),
+
+    //ring 3 descriptor
+    GDT_ENTRY(0, 0xFFFFF,
+                GDT_ACCESS_PRESENT | GDT_ACCESS_RING3 | 
+                GDT_ACCESS_CODE_SEG | GDT_ACCESS_CODE_READ | GDT_ACCESS_ACCESSED_BIT,
+                GDT_FLAG_32_BIT | GDT_FLAG_GRANULARITY_4K),
+    GDT_ENTRY(0, 0xFFFFF,
+                GDT_ACCESS_PRESENT | GDT_ACCESS_RING3 | 
+                GDT_ACCESS_DATA_SEG | GDT_ACCESS_DATA_WRITE | GDT_ACCESS_ACCESSED_BIT,
+                GDT_FLAG_32_BIT | GDT_FLAG_GRANULARITY_4K),
+
+    //tss
+    GDT_ENTRY(0, 0, 0, 0)
 };
 
 GDT_DESC gdt_desc = { sizeof(gdt_entry) - 1, gdt_entry };
@@ -90,4 +106,27 @@ void __attribute__((cdecl)) i686_gdt_load(GDT_DESC* desc, uint16_t code_seg, uin
 void i686_gdt_init()
 {   
     i686_gdt_load(&gdt_desc, i686_GDT_CODE_SEG, i686_GDT_DATA_SEG);
+}
+
+static int is_ring3_tss_gdt_init = 0;
+
+int i686_is_ring3_tss_gdt_init() { return is_ring3_tss_gdt_init; }
+
+void i686_ring3_tss_gdt_init(uint32_t stack_segment, uint32_t stack_pointer)
+{
+    printf("[LOG]Initialising TSS.");
+
+    is_ring3_tss_gdt_init = 1;
+
+    //tss gdt entry
+    tss_init(stack_segment, stack_pointer);
+    GDT_ENTRY tss_entry = GDT_ENTRY(
+            (uint32_t)tss_address(), sizeof(TSS_ENTRY) - 1,
+            GDT_ACCESS_PRESENT | GDT_ACCESS_ACCESSED_BIT | GDT_ACCESS_DESC_TSS |
+            GDT_ACCESS_EXECUTABLE | GDT_ACCESS_RING0, 
+            GDT_FLAG_32_BIT | GDT_FLAG_GRANULARITY_1B);
+    gdt_entry[5] = tss_entry;
+
+    i686_gdt_load(&gdt_desc, i686_GDT_CODE_SEG, i686_GDT_DATA_SEG);
+    flush_tss();
 }

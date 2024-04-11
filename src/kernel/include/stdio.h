@@ -26,6 +26,11 @@
 #define min(a, b) (a < b ? a : b)
 #define max(a, b) (a < b ? b : a)
 
+//VIRTUAL ADDRESS
+#define BUDDY_ALLOC_VIRADR 0x80000000
+#define KERNEL_VIRADR 0xC0000000
+
+//PHYSICAL ADDRESS
 //0x00000000-0x000003FF: interrupt vector table
 //0x00000400-0x000004FF: BIOS data area
 #define MEMORY_MIN 0x00000500
@@ -48,6 +53,8 @@ void putc(int c);
 void puts(const char* str);
 int printf(const char* fmt, ...);
 int scanf(const char* fmt, ...);
+int writef(const char* fmt, int* argp);
+int readf(const char* fmt, int* argp);
 
 void log(const char* fmt, ...);
 void debug(const char* fmt, ...);

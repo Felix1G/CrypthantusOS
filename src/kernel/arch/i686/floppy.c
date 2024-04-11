@@ -1,6 +1,7 @@
 #include "floppy.h"
 #include "io.h"
 #include "irq.h"
+#include "page.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -56,7 +57,7 @@ int floppy_cmd(int base, uint8_t cmd)
 {
     for (int i = 0;i < 200;i++)
     { //time out in 20 seconds
-        i686_sleep(100); //100ms
+        //i686_sleep(100); //100ms
         if ((i686_inb(base + FLOPPY_MSR) & 0xC0) == 0x80)
         {
             i686_outb(base + FLOPPY_FIFO, cmd);
@@ -71,7 +72,7 @@ uint32_t floppy_read_port(int base)
 {
     for (int i = 0;i < 600;i++)
     { //time out in 60 seconds
-        i686_sleep(100); //100ms
+        //i686_sleep(100); //100ms
         if (i686_inb(base + FLOPPY_MSR) & 0x80)
         {
             return i686_inb(base + FLOPPY_FIFO);
@@ -88,7 +89,7 @@ void floppy_motor(int base, int state)
         if (floppy_motor_state == FLOPPY_MOTOR_OFF)
         {
             i686_outb(base + FLOPPY_DOR, 0x1C); //on
-            i686_sleep(500); //wait for 500ms
+            //i686_sleep(500); //wait for 500ms
         }
         floppy_motor_state = FLOPPY_MOTOR_ON;
     }
@@ -150,6 +151,7 @@ int floppy_calibrate(int base)
 
 int i686_floppy_reset(int base)
 {
+    return 0;
     i686_wait_ready(FLOPPY_IRQ);
         
     //reset controller
@@ -208,7 +210,7 @@ int floppy_dma_init(int dir)
         uint32_t l;
     } addr, count;
 
-    addr.l = (uint32_t) &floppy_buffer;
+    addr.l = (uint32_t)i686_physical_addr((uint32_t)&floppy_buffer);
     count.l = (uint32_t) FLOPPY_BUFFER_LEN;
 
     if ((addr.l >> 24) || (count.l >> 16) || ( ( (addr.l & 0xFFFF) + count.l ) >> 16 ))
@@ -280,7 +282,7 @@ int floppy_execute(DISK* disk, int base, int lba, int dir)
             continue;
         }
 
-        i686_sleep(100); //give 100ms to settle after seeks
+        //i686_sleep(100); //give 100ms to settle after seeks
 
         i686_wait_ready(FLOPPY_IRQ);
         floppy_cmd(base, cmd);  //direction

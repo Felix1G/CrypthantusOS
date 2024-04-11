@@ -298,17 +298,16 @@ bool g_enable_echo = true;
 void io_enable_echo(int en) { g_enable_echo = !!en; } //1 or 0
 int io_echo() { return g_enable_echo; }
 
-//should not be called by user inputs to prevent mismatch of the console output-only cursor
-int printf(const char* format, ...)
+int writef(const char* fmt, int* argp)
 {
-    int log = !memcmp(format, "[LOG]", 5);
-    int debug = !memcmp(format, "[DEBUG]", 7);
-    int error = !memcmp(format, "[ERROR]", 7);
+    int log = !memcmp(fmt, "[LOG]", 5);
+    int debug = !memcmp(fmt, "[DEBUG]", 7);
+    int error = !memcmp(fmt, "[ERROR]", 7);
 
     if (log)
-        format += 5;
+        fmt += 5;
     else if (debug | error)
-        format += 7;
+        fmt += 7;
 
     if (g_enable_echo) {
         const char* log_prefix;
@@ -324,7 +323,6 @@ int printf(const char* format, ...)
     }
 
 printf_begin:
-    int* argp = ((int*)&format) + 1;
     int state = PRINTF_STATE_PRINT;
     int len = 0;
 
@@ -332,9 +330,9 @@ printf_begin:
 
     int min_digit = 0;
     
-    while (*format)
+    while (*fmt)
     {
-        char c = *format;
+        char c = *fmt;
         
         switch (state)
         {
@@ -424,7 +422,7 @@ printf_begin:
         min_digit = 0;
 
 printf_digit_continue_while_loop:
-        format++;
+        fmt++;
     }
 
     if (log | debug | error)
@@ -442,22 +440,18 @@ printf_digit_continue_while_loop:
     return char_written;
 }
 
-int scanf(const char* fmt, ...)
+int _read_console(const char* fmt, int* argp, int argcount, char* _buffer)
 {
-    char _buffer[SCREEN_WIDTH * SCREEN_HEIGHT + 1];
     char* buffer = _buffer;
-
-scanf_repeat_keyboard_loop:
-    buffer = _buffer;
     buffer[0] = '\0';
 
     //wait until an enter is pressed, then read the input
     while (true) {
-        //hal_io_wait_keyboard();
-        if (!hal_keyboard_up() && hal_keyboard_char() == '\n')
+        if (hal_wait_keyboard_interrupt() && !hal_keyboard_up() && hal_keyboard_char() == '\n') {
             break;
+        }
     }
-
+    
     //copy the input from the console to the buffer
     int buffer_index = 0;
     int x = out_scr_x;
@@ -473,9 +467,8 @@ scanf_repeat_keyboard_loop:
         x = 0;
     }
     buffer[buffer_index] = '\0';
-
+    
     //time to read the input!
-    int* argp = ((int*)&fmt) + 1;
     while (*fmt && *buffer)
     {
         switch (*fmt)
@@ -497,6 +490,7 @@ scanf_repeat_keyboard_loop:
 
                         memcpy(*((char**)argp), buffer, buffer_end - buffer);
                         argp++;
+                        argcount++;
                         break;
                         
                     case 'd':
@@ -544,6 +538,7 @@ scanf_repeat_keyboard_loop:
                         if (negative) number = -number;
                         **((int**)argp) = (int)number;
                         argp++;
+                        argcount++;
                         break;
                 }
             break;
@@ -551,15 +546,34 @@ scanf_repeat_keyboard_loop:
         
         fmt++;
     }
-
+    
     //update the output stream cursor
-    out_scr_x = g_scr_x - 1;
+    out_scr_x = g_scr_x;
     out_scr_y = g_scr_y;
     if (out_scr_x < 0) {
         out_scr_x = SCREEN_WIDTH - 1;
         out_scr_y--;
     }
-
+    
     if (*fmt)
-        goto scanf_repeat_keyboard_loop;
+        _read_console(fmt, argp, argcount, _buffer);
+
+    return argcount;
+}
+
+int readf(const char* fmt, int* argp)
+{
+    char _buffer[SCREEN_WIDTH * SCREEN_HEIGHT + 1];
+    return _read_console(fmt, argp, 0, _buffer);
+}
+
+//should not be called by user inputs to prevent mismatch of the console output-only cursor
+int printf(const char* fmt, ...)
+{
+    return writef(fmt, ((int*)&fmt) + 1);
+}
+
+int scanf(const char* fmt, ...)
+{
+    return readf(fmt, ((int*)&fmt) + 1);
 }

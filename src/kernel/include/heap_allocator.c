@@ -33,9 +33,9 @@ size_t heap_blocks_size;
 int heap_header_size; //heap header size
 size_t block_size; //for buddy allocation
 
-void heap_set_mem_block(szpt block, szpt adr, size_t size)
+void heap_set_mem_block(szpt block, szpt addr, size_t size)
 {
-    block[0] = (size_t)adr;
+    block[0] = (size_t)addr;
     block[1] = (size_t)size;
 }
 
@@ -280,8 +280,8 @@ malloc_allocate_in_between:
             {
                 *heapc->best_prev_free_ptr = (size_t)heapc->temp_ptr;
             }
-
-            return ((void*)*(szpt)heapc->best_alloc_ptr) + heap_header_size; //move after header
+            
+            return ((void*)(*(szpt)heapc->best_alloc_ptr)) + heap_header_size; //move after header
         }
     }
 
@@ -336,8 +336,13 @@ void* realloc(void* ptr, size_t size)
             { //available size is not enough for a free header
                 *heapc->prev_free_ptr = *heapc->free_ptr;
             }
+            else if (heap_in_mem_block((szpt)*heapc->alloc_ptr) && (void*)(szpt)*heapc->alloc_ptr < (void*)heapc->free_ptr)
+            { //the free pointer is far (there is only alloc ptr after this)
+                *(szpt)(real_ptr + size) = (size_t)heapc->free_ptr;
+                *heapc->prev_free_ptr = (size_t)(real_ptr + size);
+            }
             else
-            {
+            { //the free pointer is next to this alloc ptr
                 *(szpt)(real_ptr + size) = *heapc->free_ptr;
                 *heapc->prev_free_ptr = (size_t)(real_ptr + size);
             }

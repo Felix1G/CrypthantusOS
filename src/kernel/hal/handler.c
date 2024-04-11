@@ -1,7 +1,9 @@
 #include "hal.h"
 #include <arch/i686/io.h>
-//#include <arch/i686/page.h>
+#include <arch/i686/page.h>
+#include <arch/i686/tss.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 void (*g_keyboard_onpress_listener)(int ch, int up, const KEY_STATE* state) = NULL;
 
@@ -104,13 +106,7 @@ void hal_keyboard_onpress(void (*listener)(int ch, int up, const KEY_STATE* stat
     g_keyboard_onpress_listener = listener;
 }
 
-void _hal_isr_zdiv(REGISTERS* regs)
-{
-    printf("[ERROR]Division by Zero.");
-    i686_panic();
-}
-
-/*extern uint32_t __kernel_end;
+extern uint32_t __kernel_end;
 void _hal_irq_page_fault(REGISTERS* regs)
 {
     if ((regs->err & 0b111) == 0b000)
@@ -119,13 +115,82 @@ void _hal_irq_page_fault(REGISTERS* regs)
         size_t block_size;
         page_table = (uint32_t*)buddy_alloc(4096, &block_size);
 
-        i686_page_table(page_table, 1);
-        i686_page_enable();
-        //page_table[0] = i686_cr2();
+        i686_page_table(page_table, 1, PAGE_READ_WRITE | PAGE_PRESENT);
     }
     else
     {
         printf("[ERROR]: #PF Unhandled Error Code. (0x%8X)", regs->err);
         i686_panic();
     }
-}*/
+}
+
+void syscall0(REGISTERS* regs)
+{ //end function
+    int process_num = hal_current_process_num();
+    printf("[LOG]%s %i ended with exit code %i.",
+        (hal_process_attribute(process_num) & PROCESS_THREAD) ? "Thread" : "Process",
+        process_num, regs->ebx);
+    hal_remove_current_process();
+}
+
+void syscall1(REGISTERS* regs)
+{ //read
+    readf((const char*)regs->ebx, (int*)regs->ecx);
+}
+
+void syscall2(REGISTERS* regs)
+{ //write
+    writef((const char*)regs->ebx, (int*)regs->ecx);
+}
+
+void syscall3(REGISTERS* regs)
+{ //sleep
+    hal_set_sleep_tick(hal_current_process_num(), regs->ebx);
+    //TODO
+}
+void syscall4(REGISTERS* regs)
+{ //malloc
+    regs->ecx = (uint32_t)malloc(regs->ebx);
+}
+
+void syscall5(REGISTERS* regs)
+{ //zmalloc
+    regs->ecx = (uint32_t)zmalloc(regs->ebx);
+}
+
+void syscall6(REGISTERS* regs)
+{ //zmalloc
+    regs->edx = (uint32_t)realloc(regs->ecx, regs->ebx);
+}
+
+void syscall7(REGISTERS* regs)
+{ //free
+    free(regs->ebx);
+}
+
+/**
+ * TODO syscall 1 read
+ * TODO syscall 3 sleep
+ * TODO syscall 4-7 heap memory saving
+*/
+
+typedef void (*SYSCALL_HANDLER)(REGISTERS* regs);
+SYSCALL_HANDLER syscall_handlers[7] = {
+    syscall0, syscall1, syscall2, syscall3, syscall4, syscall5, syscall6, syscall7
+};
+
+volatile int i = 0;
+
+void _hal_isr_syscall(REGISTERS* regs)
+{
+    if (regs->eax >= 0 && regs->eax <= 3)
+        syscall_handlers[regs->eax](regs);
+    else
+        ; //run software exception signal
+    
+    i++;
+    if (i % 140000== 0) {
+        printf("[LOG]You have made a System Call. Congratz :D %i", regs->eax);
+        regs->ecx = 12030;
+    }
+}

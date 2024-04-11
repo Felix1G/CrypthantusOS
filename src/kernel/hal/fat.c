@@ -161,7 +161,7 @@ FAT_FILE *fat_open(DISK *disk, const char *path)
         if (delim != NULL)
         {
             memcpy(name, path, delim - path);
-            name[delim - path + 1] = '\0';
+            name[delim - path] = '\0';
             path = delim + 1;
         }
         else

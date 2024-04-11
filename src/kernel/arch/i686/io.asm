@@ -35,38 +35,35 @@ i686_halt:
     sti
     hlt
 
-global i686_enable_interrupts
-i686_enable_interrupts:
+global i686_enable_interrupt
+i686_enable_interrupt:
     sti
     ret
 
-global i686_disable_interrupts
-i686_disable_interrupts:
+global i686_disable_interrupt
+i686_disable_interrupt:
     cli
     ret
 
-global i686_switch_ring_mode
-i686_switch_ring_mode:
-    ; TODO
+global i686_wait_interrupt
+i686_wait_interrupt:
+    sti
+    hlt
     ret
 
-extern i686_io_keyboard_read
-global i686_io_wait_keyboard
-i686_io_wait_keyboard:
-    push    eax                 ; save eax
-
-    mov     al, 0xFD            ; mask all interrupts except IRQ 1
-    out     21h, al
+global i686_wait_keyboard_interrupt
+i686_wait_keyboard_interrupt:
+    push eax
+    mov al, 0xFC    ; mask except keyboard and idle (for preemption)
+    out 0x21, al
 
     sti
     hlt
 
-    mov     al, 0h              ; reenable all
-    out     21h, al
+    mov al, 00
+    out 0x21, al
+    pop eax
 
-    pop     eax                 ; read saved eax
-
-    call    i686_io_keyboard_read
     ret
 
 global i686_kernel_stack_segment
@@ -78,3 +75,15 @@ global i686_kernel_stack_pointer
 i686_kernel_stack_pointer:
     mov     eax, esp
     ret
+
+global i686_user_entry
+i686_user_entry:
+    call    eax
+    mov     ebx, eax            ; set exit code
+    mov     eax, 0x00           ; end program call
+    int     88h
+
+.loop_wait:                     ; wait until this process is pre-empted so that
+    jmp     .loop_wait          ; it will never run again
+
+    ret                         ; should not happen
